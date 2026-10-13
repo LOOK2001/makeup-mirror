@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Makeup Mirror</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #f3e6e8; font-family: system-ui, "Microsoft YaHei", sans-serif; }
+      #hud {
+        position: fixed; left: 16px; top: 16px; max-width: 320px;
+        padding: 12px 14px; border-radius: 10px;
+        background: rgba(255, 255, 255, 0.85); color: #3a2a30; font-size: 13px; line-height: 1.6;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12); user-select: none;
+      }
+      #hud h1 { margin: 0 0 6px; font-size: 15px; }
+      #hud kbd { padding: 0 5px; border: 1px solid #c9b3ba; border-radius: 4px; background: #fff; font-size: 12px; }
+      #tools { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0 8px; }
+      #tools button {
+        padding: 3px 8px; border: 1px solid #d9c3ca; border-radius: 6px; background: #fff;
+        color: #3a2a30; font: inherit; font-size: 12px; cursor: pointer;
+      }
+      #tools button.on { border-color: #ff4f8b; background: #ffe3ec; font-weight: 600; }
+      #tools i { display: inline-block; width: 9px; height: 9px; margin-right: 4px; border-radius: 50%; vertical-align: -1px; }
+    </style>
+  </head>
+  <body>
+    <div id="hud">
+      <h1>化妆镜 · prototype</h1>
+      <div id="tools"></div>
+      <b>桌面：</b>在镜子里的脸上按住左键拖动来化妆；点上面的按钮或按 <kbd>1</kbd>–<kbd>8</kbd> 换工具；<kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> 转头<br />
+      <b>VR：</b>用笔尖碰化妆品来选取，再把笔尖贴到自己脸上，看着镜子画
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
