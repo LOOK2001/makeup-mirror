@@ -78,6 +78,15 @@ export class FaceCanvas {
     this.fullDirty = true;
   }
 
+  // Base face with an arbitrary makeup layer on top (e.g. a challenge target).
+  compose(layer) {
+    const c = makeCanvas();
+    const ctx = c.getContext('2d');
+    ctx.drawImage(this.base, 0, 0);
+    ctx.drawImage(layer, 0, 0);
+    return c;
+  }
+
   markDirty(x0, y0, x1, y1) {
     const r = this.rect;
     if (!r) this.rect = [x0, y0, x1, y1];

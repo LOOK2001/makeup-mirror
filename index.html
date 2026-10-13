@@ -21,15 +21,28 @@
       }
       #tools button.on { border-color: #ff4f8b; background: #ffe3ec; font-weight: 600; }
       #tools i { display: inline-block; width: 9px; height: 9px; margin-right: 4px; border-radius: 50%; vertical-align: -1px; }
+      #challenge { display: flex; gap: 10px; align-items: center; margin: 4px 0 8px; padding: 8px; border-radius: 8px; background: #fff0f5; border: 1px solid #ffc2d5; }
+      #challenge[hidden] { display: none; }
+      #challenge img { width: 72px; border-radius: 6px; }
+      #challenge .time { font-weight: 600; color: #d6336c; }
+      #challenge .stars { color: #f0a500; letter-spacing: 1px; }
+      #gallery {
+        position: fixed; right: 16px; top: 16px; bottom: 16px; width: 92px;
+        display: flex; flex-direction: column; gap: 8px; overflow-y: auto;
+      }
+      #gallery:empty { display: none; }
+      #gallery img { width: 100%; border-radius: 4px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18); display: block; }
     </style>
   </head>
   <body>
     <div id="hud">
       <h1>化妆镜 · prototype</h1>
       <div id="tools"></div>
-      <b>桌面：</b>在镜子里的脸上按住左键拖动来化妆；按 <kbd>空格</kbd> 低头看搁板上的化妆品，点一下就能选取，再按 <kbd>空格</kbd> 抬头；也可以点上面的按钮或按 <kbd>1</kbd>–<kbd>8</kbd>；<kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> 转头<br />
-      <b>VR：</b>用笔尖碰化妆品来选取，再把笔尖贴到自己脸上，看着镜子画
+      <div id="challenge" hidden></div>
+      <b>桌面：</b>在镜子里的脸上按住左键拖动来化妆；按 <kbd>空格</kbd> 低头看搁板上的化妆品，点一下就能选取，再按 <kbd>空格</kbd> 抬头；也可以点上面的按钮或按 <kbd>1</kbd>–<kbd>8</kbd>；<kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> 转头；<kbd>P</kbd> 拍照（右侧相册点击可下载）；<kbd>C</kbd> 开始 / 提交化妆挑战<br />
+      <b>VR：</b>用笔尖碰化妆品来选取，再把笔尖贴到自己脸上，看着镜子画；碰相机或按 A / X 拍照；碰铃铛或按 B / Y 开始 / 提交挑战
     </div>
+    <div id="gallery"></div>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

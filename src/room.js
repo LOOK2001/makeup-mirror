@@ -253,7 +253,7 @@ export function buildMirrorFrame(scene, L) {
   // shelf under the mirror that holds the products, on two gold brackets
   const shelfDepth = 0.21;
   const shelf = new THREE.Mesh(
-    new RoundedBoxGeometry(0.86, 0.025, shelfDepth, 3, 0.008),
+    new RoundedBoxGeometry(1.04, 0.025, shelfDepth, 3, 0.008),
     new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.3, clearcoat: 0.8 }),
   );
   shelf.position.set(0, L.SHELF_Y - 0.0125, L.MIRROR_Z - 0.05 + shelfDepth / 2);
@@ -265,7 +265,7 @@ export function buildMirrorFrame(scene, L) {
     const arm = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.005, 8, 24, Math.PI / 2), bracketMat);
     // quarter arc from the wall (below) out to the shelf's underside
     arm.rotation.set(Math.PI, -Math.PI / 2, 0, 'YXZ');
-    arm.position.set(s * 0.33, L.SHELF_Y - 0.025, L.MIRROR_Z - 0.05);
+    arm.position.set(s * 0.42, L.SHELF_Y - 0.025, L.MIRROR_Z - 0.05);
     scene.add(arm);
   }
 

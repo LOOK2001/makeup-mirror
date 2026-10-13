@@ -7,6 +7,9 @@ import { FaceCanvas } from './faceCanvas.js';
 import { Avatar, AVATAR_LAYER } from './avatar.js';
 import { TOOLS, createToolTray, setSelected, createBrush, styleBrush, BRUSH_TIP_LOCAL } from './tools.js';
 import { buildRoom, buildMirrorFrame, archShape } from './room.js';
+import { PhotoBooth, PhotoWall, polaroid, timeCaption } from './photo.js';
+import { LOOKS, drawLook, scoreFace, stars, ChallengeBoard, Challenge, formatTime } from './challenge.js';
+import * as sfx from './sfx.js';
 
 // ---------- layout (metres; the player stands at the origin facing -Z) ----------
 const COUNTER_TOP = 1.0;
@@ -98,6 +101,103 @@ scene.add(tray);
 const raycaster = new THREE.Raycaster();
 raycaster.layers.enableAll();
 
+// ---------- photos ----------
+const booth = new PhotoBooth(renderer, scene, avatar, { minZ: MIRROR_Z + 0.06 });
+const photoWall = new PhotoWall(scene, new THREE.Vector3(MIRROR_W / 2 + 0.145, MIRROR_Y + 0.17, MIRROR_Z - 0.045));
+const galleryEl = document.getElementById('gallery');
+
+// white flash in front of the player's eyes; on its own layer so photos don't see it
+const FLASH_LAYER = 6;
+const flash = new THREE.Mesh(
+  new THREE.PlaneGeometry(2, 2),
+  new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthTest: false, toneMapped: false }),
+);
+flash.position.z = -0.05;
+flash.renderOrder = 999;
+flash.layers.set(FLASH_LAYER);
+camera.add(flash);
+camera.layers.enable(FLASH_LAYER);
+
+function takePhoto(caption = timeCaption()) {
+  face.flush(renderer);
+  const card = polaroid(booth.capture(), caption);
+  photoWall.add(card);
+  const a = document.createElement('a');
+  a.href = card.toDataURL('image/png');
+  a.download = `makeup-${Date.now()}.png`;
+  a.title = '点击下载';
+  a.innerHTML = `<img src="${a.href}" alt="${caption}">`;
+  galleryEl.prepend(a);
+  while (galleryEl.children.length > 12) galleryEl.lastChild.remove();
+  flash.material.opacity = 0.9;
+  sfx.shutter();
+}
+
+// ---------- makeup challenge ----------
+const board = new ChallengeBoard(scene, new THREE.Vector3(-(MIRROR_W / 2 + 0.17), MIRROR_Y, MIRROR_Z - 0.045));
+const challengeEl = document.getElementById('challenge');
+const challenge = new Challenge({ duration: 120, onChange: showChallenge });
+let lastLook = null;
+
+function startChallenge() {
+  const pool = LOOKS.filter((l) => l !== lastLook); // never the same look twice in a row
+  const look = pool[Math.floor(Math.random() * pool.length)];
+  lastLook = look;
+  const targetLayer = drawLook(look);
+
+  // reference card: the avatar wearing the target look, facing straight ahead
+  const refTex = new THREE.CanvasTexture(face.compose(targetLayer));
+  refTex.colorSpace = THREE.SRGBColorSpace;
+  const mat = avatar.headMesh.material;
+  mat.map = refTex;
+  hands.forEach((h) => { h.controller.visible = false; });
+  const reference = booth.capture({ neutral: true });
+  hands.forEach((h) => { h.controller.visible = !!h.inputSource; });
+  mat.map = face.texture;
+  refTex.dispose();
+
+  face.clear();
+  challenge.start(look, reference, targetLayer);
+  sfx.ding();
+}
+
+function finishChallenge() {
+  const { look, targetLayer } = challenge.state;
+  const score = scoreFace(face, targetLayer);
+  challenge.finish(score);
+  takePhoto(`${look.name} · ${score}分`);
+  sfx.fanfare();
+}
+
+function showChallenge(st) {
+  if (st.phase === 'running') {
+    const lines = [`剩余 ${formatTime(st.timeLeft)}`, '画好了碰铃铛提交'];
+    board.render({ title: st.look.name, reference: st.reference, lines });
+    if (!challengeEl.dataset.look || challengeEl.dataset.look !== st.look.name) {
+      challengeEl.dataset.look = st.look.name;
+      challengeEl.innerHTML = `<img src="${st.reference.toDataURL()}" alt=""><div><b>${st.look.name}</b><br><small>${st.look.hint}</small><br><span class="time"></span><br><small>按 C 提交</small></div>`;
+    }
+    challengeEl.querySelector('.time').textContent = `剩余 ${formatTime(st.timeLeft)}`;
+    challengeEl.hidden = false;
+  } else if (st.phase === 'result') {
+    board.render({ title: st.look.name, reference: st.reference, lines: [`得分 ${st.score}`, stars(st.score)] });
+    challengeEl.dataset.look = '';
+    challengeEl.innerHTML = `<img src="${st.reference.toDataURL()}" alt=""><div><b>${st.look.name}</b><br>得分 <b>${st.score}</b><br><span class="stars">${stars(st.score)}</span><br><small>按 C 再来一局</small></div>`;
+  }
+}
+
+function toggleChallenge() {
+  if (challenge.running) finishChallenge();
+  else startChallenge();
+}
+
+// clear / photo / challenge items run an action instead of becoming the brush
+function runAction(action) {
+  if (action === 'clear') face.clear();
+  else if (action === 'photo') takePhoto();
+  else if (action === 'challenge') toggleChallenge();
+}
+
 // ---------- XR controllers ----------
 const modelFactory = new XRControllerModelFactory();
 const hands = [0, 1].map((i) => {
@@ -110,7 +210,7 @@ const hands = [0, 1].map((i) => {
   grip.add(modelFactory.createControllerModel(grip));
   scene.add(grip);
 
-  const hand = { controller, brush, tool: TOOLS[i === 0 ? 0 : 1], lastUV: null, touching: new Set(), inputSource: null };
+  const hand = { controller, brush, tool: TOOLS[i === 0 ? 0 : 1], lastUV: null, touching: new Set(), inputSource: null, pressed: [] };
   controller.addEventListener('connected', (e) => { hand.inputSource = e.data; });
   controller.addEventListener('disconnected', () => { hand.inputSource = null; });
   return hand;
@@ -123,7 +223,8 @@ const SHELF_PITCH = -Math.atan2(DESKTOP_EYE.y - SHELF_Y - 0.03, -TOOLS_Z);
 const toolsEl = document.getElementById('tools');
 TOOLS.forEach((tool, i) => {
   const b = document.createElement('button');
-  b.innerHTML = `<i style="background:${tool.color}"></i>${i + 1} ${tool.name}`;
+  const keyName = { photo: 'P', challenge: 'C' }[tool.id] ?? (i + 1);
+  b.innerHTML = `<i style="background:${tool.color}"></i>${keyName} ${tool.name}`;
   b.onclick = () => { pickDesktopTool(tool); refreshSelection(); };
   toolsEl.appendChild(b);
 });
@@ -131,7 +232,7 @@ pickDesktopTool(TOOLS[0]);
 refreshSelection();
 
 function pickDesktopTool(tool) {
-  if (tool.action === 'clear') { face.clear(); return; }
+  if (tool.action) { runAction(tool.action); return; }
   desktop.tool = tool;
   [...toolsEl.children].forEach((b, i) => b.classList.toggle('on', TOOLS[i] === tool));
 }
@@ -144,7 +245,9 @@ function refreshSelection() {
 
 window.addEventListener('keydown', (e) => {
   const n = parseInt(e.key, 10);
-  if (n >= 1 && n <= TOOLS.length) { pickDesktopTool(TOOLS[n - 1]); refreshSelection(); }
+  if (n >= 1 && n <= 8) { pickDesktopTool(TOOLS[n - 1]); refreshSelection(); }
+  if (e.code === 'KeyP' && !e.repeat) takePhoto();
+  if (e.code === 'KeyC' && !e.repeat) toggleChallenge();
   if (e.code === 'Space') { // glance down at the shelf / back up at the mirror
     e.preventDefault();
     desktop.targetPitch = desktop.targetPitch === 0 ? SHELF_PITCH : 0;
@@ -198,6 +301,13 @@ const _origin = new THREE.Vector3();
 
 function updateHand(hand) {
   if (!hand.inputSource) return;
+  // A / X takes a photo, B / Y starts or submits a challenge
+  const buttons = hand.inputSource.gamepad?.buttons ?? [];
+  for (const [i, action] of [[4, 'photo'], [5, 'challenge']]) {
+    const down = !!buttons[i]?.pressed;
+    if (down && !hand.pressed[i]) runAction(action);
+    hand.pressed[i] = down;
+  }
   hand.controller.updateMatrixWorld(true);
   _tip.copy(BRUSH_TIP_LOCAL);
   hand.controller.localToWorld(_tip);
@@ -207,7 +317,7 @@ function updateHand(hand) {
     it.mesh.localToWorld(_tp.set(0, 0.025, 0));
     const inside = _tip.distanceTo(_tp) < TOOL_TOUCH_R;
     if (inside && !hand.touching.has(it)) {
-      if (it.tool.action === 'clear') face.clear();
+      if (it.tool.action) runAction(it.tool.action);
       else hand.tool = it.tool;
       refreshSelection();
       pulse(hand, 0.6, 60);
@@ -269,6 +379,8 @@ renderer.setAnimationLoop(() => {
   }
 
   avatar.update(camera, dt);
+  if (challenge.update(dt)) finishChallenge();
+  if (flash.material.opacity > 0) flash.material.opacity = Math.max(0, flash.material.opacity - dt * 3);
   if (renderer.xr.isPresenting) hands.forEach(updateHand);
   face.flush(renderer);
 

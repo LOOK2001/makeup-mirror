@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 
 // radius is in face-texture pixels (~0.3 mm each on the head).
 export const TOOLS = [
@@ -10,6 +11,8 @@ export const TOOLS = [
   { id: 'paint', name: '彩绘', color: '#25b8ff', radius: 12, alpha: 0.9, soft: false, kind: 'pot' },
   { id: 'remover', name: '卸妆棉', color: '#ffffff', radius: 44, alpha: 0.5, soft: true, erase: true, kind: 'pad' },
   { id: 'clear', name: '全部卸妆', color: '#9fd8e8', action: 'clear', kind: 'bottle' },
+  { id: 'photo', name: '拍照', color: '#7ec8e3', action: 'photo', kind: 'camera' },
+  { id: 'challenge', name: '挑战', color: '#e0b860', action: 'challenge', kind: 'bell' },
 ];
 
 const gold = new THREE.MeshPhysicalMaterial({ color: 0xe0b860, metalness: 1, roughness: 0.25, clearcoat: 0.5 });
@@ -109,6 +112,24 @@ function buildMesh(tool) {
       add(label, 0, 0.035);
       break;
     }
+    case 'camera': {
+      // instant camera: rounded body, big lens, flash window
+      add(new THREE.Mesh(new RoundedBoxGeometry(0.07, 0.05, 0.04, 3, 0.008), new THREE.MeshPhysicalMaterial({ color: tool.color, roughness: 0.4, clearcoat: 0.6 })), 0, 0.025);
+      const lens = add(new THREE.Mesh(lathe([[0, 0], [0.016, 0], [0.016, 0.01], [0.012, 0.012], [0, 0.012]], 32), blackGloss), 0, 0.024, 0.02);
+      lens.rotation.x = Math.PI / 2;
+      add(new THREE.Mesh(new THREE.CircleGeometry(0.009, 24), mirrorMat), 0, 0.024, 0.0325);
+      add(new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.008, 0.002), new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.4 })), 0.022, 0.04, 0.0205);
+      add(new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.004, 16), new THREE.MeshStandardMaterial({ color: 0xff4f8b })), -0.022, 0.052, 0);
+      break;
+    }
+    case 'bell': {
+      // desk bell: wooden base, gold dome, push button
+      add(new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.032, 0.01, 40), new THREE.MeshStandardMaterial({ color: 0x8a5a3c, roughness: 0.6 })), 0, 0.005);
+      add(new THREE.Mesh(new THREE.SphereGeometry(0.026, 40, 20, 0, Math.PI * 2, 0, Math.PI / 2), gold), 0, 0.01);
+      add(new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.01, 12), gold), 0, 0.039);
+      add(new THREE.Mesh(new THREE.SphereGeometry(0.006, 16, 12), gold), 0, 0.045);
+      break;
+    }
   }
   g.traverse((o) => { if (o.isMesh) { o.castShadow = true; } });
 
@@ -158,7 +179,7 @@ function buildLabel(text, color) {
 export function createToolTray(counterTopY, z) {
   const tray = new THREE.Group();
   const items = [];
-  const spacing = 0.098;
+  const spacing = 0.096;
   TOOLS.forEach((tool, i) => {
     const mesh = buildMesh(tool);
     mesh.position.set((i - (TOOLS.length - 1) / 2) * spacing, counterTopY, z);
