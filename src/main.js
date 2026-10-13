@@ -14,9 +14,13 @@ const MIRROR_Z = -0.4; // close, like leaning in to a vanity
 const MIRROR_W = 0.46;
 const MIRROR_H = 0.6; // a flat mirror shows ~2x its height: head, neck, a bit of chest
 const MIRROR_Y = COUNTER_TOP + 0.25 + MIRROR_H / 2; // centre ~1.55 m, around eye height when standing
-const LAYOUT = { COUNTER_TOP, MIRROR_Z, MIRROR_W, MIRROR_H, MIRROR_Y };
+// the products sit on a shelf right under the mirror: a short glance down, easy reach
+const SHELF_Y = MIRROR_Y - MIRROR_H / 2 - 0.06;
+const TOOLS_Z = MIRROR_Z + 0.1;
+const LAYOUT = { COUNTER_TOP, MIRROR_Z, MIRROR_W, MIRROR_H, MIRROR_Y, SHELF_Y };
 const DESKTOP_EYE = new THREE.Vector3(0, 1.58, 0);
 const DESKTOP_FOV = 28; // narrow so the reflection fills the screen on desktop
+const SHELF_FOV = 60;
 
 // contact tuning for painting with a controller
 const CONTACT_GAP = 0.006;   // start painting this far before touching the skin
@@ -51,7 +55,7 @@ scene.add(new THREE.HemisphereLight(0xfff6f0, 0xd8b8c0, 0.6));
 // key light from above-front: casts the soft shadows of the products on the counter
 const key = new THREE.DirectionalLight(0xfff4ea, 1.4);
 key.position.set(0.4, 2.6, 0.9);
-key.target.position.set(0, COUNTER_TOP, MIRROR_Z + 0.2);
+key.target.position.set(0, SHELF_Y, TOOLS_Z);
 key.castShadow = true;
 key.shadow.mapSize.set(1024, 1024);
 Object.assign(key.shadow.camera, { left: -0.7, right: 0.7, top: 0.7, bottom: -0.7, near: 0.5, far: 4 });
@@ -88,7 +92,7 @@ const avatar = new Avatar(face.texture);
 scene.add(avatar.root);
 
 // ---------- tools ----------
-const { tray, items } = createToolTray(COUNTER_TOP, MIRROR_Z + 0.2);
+const { tray, items } = createToolTray(SHELF_Y, TOOLS_Z);
 scene.add(tray);
 
 const raycaster = new THREE.Raycaster();
@@ -113,7 +117,9 @@ const hands = [0, 1].map((i) => {
 });
 
 // ---------- desktop state ----------
-const desktop = { tool: TOOLS[0], yaw: 0, pitch: 0, painting: false, lastUV: null, keys: new Set() };
+const desktop = { tool: TOOLS[0], yaw: 0, pitch: 0, targetPitch: 0, painting: false, lastUV: null, keys: new Set() };
+// pitch that puts the shelf in the middle of the desktop view
+const SHELF_PITCH = -Math.atan2(DESKTOP_EYE.y - SHELF_Y - 0.03, -TOOLS_Z);
 const toolsEl = document.getElementById('tools');
 TOOLS.forEach((tool, i) => {
   const b = document.createElement('button');
@@ -139,6 +145,10 @@ function refreshSelection() {
 window.addEventListener('keydown', (e) => {
   const n = parseInt(e.key, 10);
   if (n >= 1 && n <= TOOLS.length) { pickDesktopTool(TOOLS[n - 1]); refreshSelection(); }
+  if (e.code === 'Space') { // glance down at the shelf / back up at the mirror
+    e.preventDefault();
+    desktop.targetPitch = desktop.targetPitch === 0 ? SHELF_PITCH : 0;
+  }
   desktop.keys.add(e.key);
 });
 window.addEventListener('keyup', (e) => desktop.keys.delete(e.key));
@@ -146,6 +156,11 @@ window.addEventListener('keyup', (e) => desktop.keys.delete(e.key));
 const ndc = new THREE.Vector2();
 renderer.domElement.addEventListener('pointerdown', (e) => {
   if (e.button !== 0) return;
+  // clicking a product picks it up, like dipping the brush in VR
+  ndc.set((e.clientX / window.innerWidth) * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1);
+  raycaster.setFromCamera(ndc, camera);
+  const hitTool = items.find((it) => raycaster.intersectObject(it.mesh, true).length > 0);
+  if (hitTool) { pickDesktopTool(hitTool.tool); refreshSelection(); return; }
   desktop.painting = true;
   desktop.lastUV = null;
   paintFromPointer(e);
@@ -239,12 +254,17 @@ renderer.setAnimationLoop(() => {
     const turn = 1.2 * dt;
     if (k.has('ArrowLeft')) desktop.yaw += turn;
     if (k.has('ArrowRight')) desktop.yaw -= turn;
-    if (k.has('ArrowUp')) desktop.pitch += turn;
-    if (k.has('ArrowDown')) desktop.pitch -= turn;
+    if (k.has('ArrowUp')) desktop.targetPitch = desktop.pitch += turn;
+    if (k.has('ArrowDown')) desktop.targetPitch = desktop.pitch -= turn;
+    desktop.pitch += (desktop.targetPitch - desktop.pitch) * Math.min(1, dt * 8);
     desktop.yaw = THREE.MathUtils.clamp(desktop.yaw, -0.9, 0.9);
-    desktop.pitch = THREE.MathUtils.clamp(desktop.pitch, -0.6, 0.6);
+    desktop.pitch = THREE.MathUtils.clamp(desktop.pitch, -1.1, 0.6);
+    desktop.targetPitch = THREE.MathUtils.clamp(desktop.targetPitch, -1.1, 0.6);
     camera.position.copy(DESKTOP_EYE);
     camera.rotation.set(desktop.pitch, desktop.yaw, 0, 'YXZ');
+    // widen the view while glancing down so the whole shelf fits
+    camera.fov = THREE.MathUtils.lerp(DESKTOP_FOV, SHELF_FOV, THREE.MathUtils.clamp(desktop.pitch / SHELF_PITCH, 0, 1));
+    camera.updateProjectionMatrix();
     camera.updateMatrixWorld();
   }
 

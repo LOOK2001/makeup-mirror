@@ -211,7 +211,7 @@ export function buildRoom(scene, L) {
   // decor at the back corners of the counter, out of the way of the tools
   const vaseGlass = new THREE.MeshPhysicalMaterial({ color: 0xd8f0ff, roughness: 0.05, transparent: true, opacity: 0.5, clearcoat: 1 });
   const vase = new THREE.Mesh(new THREE.LatheGeometry([[0, 0], [0.035, 0], [0.045, 0.05], [0.03, 0.12], [0.034, 0.15], [0, 0.15]].map(([x, y]) => new THREE.Vector2(x, y)), 32), vaseGlass);
-  vase.position.set(-0.43, L.COUNTER_TOP, L.MIRROR_Z + 0.07);
+  vase.position.set(-0.43, L.COUNTER_TOP, L.MIRROR_Z + 0.22); // in front of the shelf so the flowers clear it
   shadowed(vase);
   const stemMat = new THREE.MeshStandardMaterial({ color: 0x4f9a5a });
   const petals = [0xff7fa3, 0xffffff, 0xffb3c6, 0xff5c8a, 0xfff0a0];
@@ -231,10 +231,10 @@ export function buildRoom(scene, L) {
     scene.add(grp);
   }
   const perfume = new THREE.Mesh(new RoundedBoxGeometry(0.05, 0.07, 0.03, 3, 0.008), new THREE.MeshPhysicalMaterial({ color: 0xffc0d8, roughness: 0.05, transparent: true, opacity: 0.7, clearcoat: 1 }));
-  perfume.position.set(0.42, L.COUNTER_TOP + 0.035, L.MIRROR_Z + 0.07);
+  perfume.position.set(0.42, L.COUNTER_TOP + 0.035, L.MIRROR_Z + 0.22);
   shadowed(perfume);
   const pcap = new THREE.Mesh(new THREE.SphereGeometry(0.014, 24, 16), knob);
-  pcap.position.set(0.42, L.COUNTER_TOP + 0.08, L.MIRROR_Z + 0.07);
+  pcap.position.set(0.42, L.COUNTER_TOP + 0.08, L.MIRROR_Z + 0.22);
   shadowed(pcap);
 }
 
@@ -249,6 +249,25 @@ export function buildMirrorFrame(scene, L) {
   frame.castShadow = true;
   frame.receiveShadow = true;
   scene.add(frame);
+
+  // shelf under the mirror that holds the products, on two gold brackets
+  const shelfDepth = 0.21;
+  const shelf = new THREE.Mesh(
+    new RoundedBoxGeometry(0.86, 0.025, shelfDepth, 3, 0.008),
+    new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.3, clearcoat: 0.8 }),
+  );
+  shelf.position.set(0, L.SHELF_Y - 0.0125, L.MIRROR_Z - 0.05 + shelfDepth / 2);
+  shelf.castShadow = true;
+  shelf.receiveShadow = true;
+  scene.add(shelf);
+  const bracketMat = new THREE.MeshPhysicalMaterial({ color: 0xe0b860, metalness: 1, roughness: 0.3 });
+  for (const s of [-1, 1]) {
+    const arm = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.005, 8, 24, Math.PI / 2), bracketMat);
+    // quarter arc from the wall (below) out to the shelf's underside
+    arm.rotation.set(Math.PI, -Math.PI / 2, 0, 'YXZ');
+    arm.position.set(s * 0.33, L.SHELF_Y - 0.025, L.MIRROR_Z - 0.05);
+    scene.add(arm);
+  }
 
   // Hollywood bulbs along the frame (not on the bottom edge)
   const bulbMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xfff0cc, emissiveIntensity: 2.2 });
