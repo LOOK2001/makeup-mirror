@@ -2,16 +2,19 @@ import * as THREE from 'three';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 import { Reflector } from 'three/addons/objects/Reflector.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { FaceCanvas } from './faceCanvas.js';
 import { Avatar, AVATAR_LAYER } from './avatar.js';
-import { TOOLS, createToolTray, setSelected, createBrush, BRUSH_TIP_LOCAL } from './tools.js';
+import { TOOLS, createToolTray, setSelected, createBrush, styleBrush, BRUSH_TIP_LOCAL } from './tools.js';
+import { buildRoom, buildMirrorFrame, archShape } from './room.js';
 
 // ---------- layout (metres; the player stands at the origin facing -Z) ----------
 const COUNTER_TOP = 1.0;
 const MIRROR_Z = -0.6;
-const MIRROR_W = 0.8;
-const MIRROR_H = 1.0;
-const MIRROR_Y = COUNTER_TOP + 0.08 + MIRROR_H / 2;
+const MIRROR_W = 0.56;
+const MIRROR_H = 0.78;
+const MIRROR_Y = COUNTER_TOP + 0.15 + MIRROR_H / 2; // centre ~1.54 m, around face height when standing
+const LAYOUT = { COUNTER_TOP, MIRROR_Z, MIRROR_W, MIRROR_H, MIRROR_Y };
 const DESKTOP_EYE = new THREE.Vector3(0, 1.58, 0);
 const DESKTOP_FOV = 32; // narrow so the reflection fills the screen on desktop
 
@@ -24,6 +27,10 @@ const TOOL_TOUCH_R = 0.035;
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.toneMapping = THREE.NeutralToneMapping; // keeps cartoon colours saturated
+renderer.toneMappingExposure = 0.95;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.xr.enabled = true;
 renderer.xr.cameraAutoUpdate = false; // we update it ourselves so the avatar has no frame lag
 document.body.appendChild(renderer.domElement);
@@ -31,33 +38,49 @@ document.body.appendChild(VRButton.createButton(renderer));
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xf3e6e8);
+// soft image-based lighting for reflections on gold, glass and skin
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environmentIntensity = 0.35;
 
 const camera = new THREE.PerspectiveCamera(DESKTOP_FOV, window.innerWidth / window.innerHeight, 0.01, 50);
 camera.position.copy(DESKTOP_EYE);
 scene.add(camera);
 
-scene.add(new THREE.HemisphereLight(0xffffff, 0xcdb3bb, 1.3));
-const key = new THREE.DirectionalLight(0xffffff, 0.9);
-key.position.set(0.5, 2.5, 1.5);
-scene.add(key);
-// vanity light in front of the face so the reflection is well lit
-const faceLight = new THREE.PointLight(0xfff1e0, 0.35, 3, 2);
-faceLight.position.set(0, MIRROR_Y + 0.2, MIRROR_Z + 0.15);
+scene.add(new THREE.HemisphereLight(0xfff6f0, 0xd8b8c0, 0.6));
+// key light from above-front: casts the soft shadows of the products on the counter
+const key = new THREE.DirectionalLight(0xfff4ea, 1.4);
+key.position.set(0.4, 2.6, 0.9);
+key.target.position.set(0, COUNTER_TOP, MIRROR_Z + 0.2);
+key.castShadow = true;
+key.shadow.mapSize.set(1024, 1024);
+Object.assign(key.shadow.camera, { left: -0.7, right: 0.7, top: 0.7, bottom: -0.7, near: 0.5, far: 4 });
+key.shadow.bias = -0.0005;
+key.shadow.normalBias = 0.01;
+key.shadow.radius = 4;
+scene.add(key, key.target);
+// daylight from the window on the left
+const windowLight = new THREE.DirectionalLight(0xdbeeff, 0.5);
+windowLight.position.set(-2, 1.8, 0.3);
+scene.add(windowLight);
+// warm vanity bulbs lighting the face (seen in the mirror)
+const faceLight = new THREE.PointLight(0xffe6c8, 0.4, 2.5, 2);
+faceLight.position.set(0, MIRROR_Y + 0.15, MIRROR_Z + 0.2);
 scene.add(faceLight);
 
-buildRoom();
+buildRoom(scene, LAYOUT);
 
 // ---------- mirror ----------
-const mirror = new Reflector(new THREE.PlaneGeometry(MIRROR_W, MIRROR_H), {
-  textureWidth: 1536,
-  textureHeight: 1920,
-  color: 0xe6e6e6,
+const mirror = new Reflector(new THREE.ShapeGeometry(archShape(MIRROR_W, MIRROR_H), 64), {
+  textureWidth: 1152,
+  textureHeight: 1600,
+  color: 0xeeeeee,
   clipBias: 0.003,
 });
 mirror.position.set(0, MIRROR_Y, MIRROR_Z);
 mirror.camera.layers.enable(AVATAR_LAYER); // only the mirror sees the avatar
 scene.add(mirror);
-buildMirrorFrame();
+buildMirrorFrame(scene, LAYOUT);
 
 // ---------- avatar + face paint ----------
 const face = new FaceCanvas();
@@ -65,7 +88,7 @@ const avatar = new Avatar(face.texture);
 scene.add(avatar.root);
 
 // ---------- tools ----------
-const { tray, items } = createToolTray(COUNTER_TOP, -0.34);
+const { tray, items } = createToolTray(COUNTER_TOP, MIRROR_Z + 0.27);
 scene.add(tray);
 
 const raycaster = new THREE.Raycaster();
@@ -95,7 +118,7 @@ const toolsEl = document.getElementById('tools');
 TOOLS.forEach((tool, i) => {
   const b = document.createElement('button');
   b.innerHTML = `<i style="background:${tool.color}"></i>${i + 1} ${tool.name}`;
-  b.onclick = () => pickDesktopTool(tool);
+  b.onclick = () => { pickDesktopTool(tool); refreshSelection(); };
   toolsEl.appendChild(b);
 });
 pickDesktopTool(TOOLS[0]);
@@ -110,7 +133,7 @@ function pickDesktopTool(tool) {
 function refreshSelection() {
   const selected = renderer.xr.isPresenting ? hands.map((h) => h.tool) : [desktop.tool];
   setSelected(items, selected);
-  for (const h of hands) h.brush.userData.tipMat.color.set(h.tool.color);
+  for (const h of hands) styleBrush(h.brush, h.tool);
 }
 
 window.addEventListener('keydown', (e) => {
@@ -225,9 +248,9 @@ renderer.setAnimationLoop(() => {
     camera.updateMatrixWorld();
   }
 
-  avatar.update(camera);
+  avatar.update(camera, dt);
   if (renderer.xr.isPresenting) hands.forEach(updateHand);
-  face.flush();
+  face.flush(renderer);
 
   renderer.render(scene, camera);
 });
@@ -237,72 +260,3 @@ window.addEventListener('resize', () => {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
-
-// ---------- set dressing ----------
-function buildRoom() {
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(6, 6), new THREE.MeshStandardMaterial({ color: 0xd9c2b0, roughness: 0.9 }));
-  floor.rotation.x = -Math.PI / 2;
-  scene.add(floor);
-
-  const wallMat = new THREE.MeshStandardMaterial({ color: 0xf6d7de, roughness: 1 });
-  const back = new THREE.Mesh(new THREE.PlaneGeometry(6, 3), wallMat);
-  back.position.set(0, 1.5, MIRROR_Z - 0.05);
-  scene.add(back);
-  for (const side of [-1, 1]) {
-    const w = new THREE.Mesh(new THREE.PlaneGeometry(4, 3), wallMat);
-    w.rotation.y = -side * Math.PI / 2;
-    w.position.set(side * 1.6, 1.5, 0.8);
-    scene.add(w);
-  }
-  const behind = new THREE.Mesh(new THREE.PlaneGeometry(6, 3), new THREE.MeshStandardMaterial({ color: 0xe9c6cf, roughness: 1 }));
-  behind.rotation.y = Math.PI;
-  behind.position.set(0, 1.5, 2.2);
-  scene.add(behind);
-
-  // a couple of things behind the player so the reflection has depth
-  const shelf = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.04, 0.25), new THREE.MeshStandardMaterial({ color: 0xffffff }));
-  shelf.position.set(0, 1.4, 2.08);
-  scene.add(shelf);
-  const potColors = [0x8fd3c7, 0xffc857, 0xb39ddb];
-  potColors.forEach((c, i) => {
-    const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.12, 20), new THREE.MeshStandardMaterial({ color: c }));
-    pot.position.set(-0.4 + i * 0.4, 1.48, 2.08);
-    scene.add(pot);
-    const plant = new THREE.Mesh(new THREE.IcosahedronGeometry(0.09, 1), new THREE.MeshStandardMaterial({ color: 0x5fae6b, flatShading: true }));
-    plant.position.set(-0.4 + i * 0.4, 1.6, 2.08);
-    scene.add(plant);
-  });
-
-  const counter = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.06, 0.36), new THREE.MeshStandardMaterial({ color: 0xfffaf7, roughness: 0.4 }));
-  counter.position.set(0, COUNTER_TOP - 0.03, MIRROR_Z + 0.18);
-  scene.add(counter);
-  const cabinet = new THREE.Mesh(new THREE.BoxGeometry(0.96, COUNTER_TOP - 0.06, 0.32), new THREE.MeshStandardMaterial({ color: 0xc98ea0, roughness: 0.8 }));
-  cabinet.position.set(0, (COUNTER_TOP - 0.06) / 2, MIRROR_Z + 0.17);
-  scene.add(cabinet);
-}
-
-function buildMirrorFrame() {
-  const frameMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 });
-  const t = 0.05;
-  const parts = [
-    [MIRROR_W + 2 * t, t, 0, MIRROR_H / 2 + t / 2],
-    [MIRROR_W + 2 * t, t, 0, -MIRROR_H / 2 - t / 2],
-    [t, MIRROR_H, -MIRROR_W / 2 - t / 2, 0],
-    [t, MIRROR_H, MIRROR_W / 2 + t / 2, 0],
-  ];
-  for (const [w, h, x, y] of parts) {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.03), frameMat);
-    m.position.set(x, MIRROR_Y + y, MIRROR_Z);
-    scene.add(m);
-  }
-  // Hollywood-style bulbs
-  const bulbMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xfff2d0, emissiveIntensity: 1.5 });
-  const bulbGeo = new THREE.SphereGeometry(0.016, 16, 12);
-  for (const side of [-1, 1]) {
-    for (let i = 0; i < 6; i++) {
-      const b = new THREE.Mesh(bulbGeo, bulbMat);
-      b.position.set(side * (MIRROR_W / 2 + t / 2), MIRROR_Y - MIRROR_H / 2 + 0.08 + i * (MIRROR_H - 0.16) / 5, MIRROR_Z + 0.025);
-      scene.add(b);
-    }
-  }
-}
