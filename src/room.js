@@ -190,28 +190,28 @@ export function buildRoom(scene, L) {
   });
 
   // vanity counter + cabinet with drawers
-  const top = new THREE.Mesh(new RoundedBoxGeometry(1.04, 0.05, 0.38, 3, 0.012), new THREE.MeshPhysicalMaterial({ map: marble(), roughness: 0.25, clearcoat: 0.6 }));
-  top.position.set(0, L.COUNTER_TOP - 0.025, L.MIRROR_Z + 0.18);
+  const top = new THREE.Mesh(new RoundedBoxGeometry(1.04, 0.05, 0.3, 3, 0.012), new THREE.MeshPhysicalMaterial({ map: marble(), roughness: 0.25, clearcoat: 0.6 }));
+  top.position.set(0, L.COUNTER_TOP - 0.025, L.MIRROR_Z + 0.13);
   shadowed(top, true, true);
   const cabMat = new THREE.MeshStandardMaterial({ color: 0xd99aac, roughness: 0.6 });
-  const cabinet = new THREE.Mesh(new RoundedBoxGeometry(0.98, L.COUNTER_TOP - 0.05, 0.33, 3, 0.01), cabMat);
-  cabinet.position.set(0, (L.COUNTER_TOP - 0.05) / 2, L.MIRROR_Z + 0.17);
+  const cabinet = new THREE.Mesh(new RoundedBoxGeometry(0.98, L.COUNTER_TOP - 0.05, 0.26, 3, 0.01), cabMat);
+  cabinet.position.set(0, (L.COUNTER_TOP - 0.05) / 2, L.MIRROR_Z + 0.12);
   shadowed(cabinet, false, true);
   const knob = new THREE.MeshPhysicalMaterial({ color: 0xe0b860, metalness: 1, roughness: 0.25 });
   for (let row = 0; row < 3; row++) for (const s of [-1, 1]) {
     const y = L.COUNTER_TOP - 0.16 - row * 0.28;
     const d = new THREE.Mesh(new RoundedBoxGeometry(0.44, 0.24, 0.02, 2, 0.006), cabMat);
-    d.position.set(s * 0.235, y, L.MIRROR_Z + 0.34);
+    d.position.set(s * 0.235, y, L.MIRROR_Z + 0.26);
     shadowed(d, false, true);
     const k = new THREE.Mesh(new THREE.SphereGeometry(0.012, 16, 12), knob);
-    k.position.set(s * 0.235, y, L.MIRROR_Z + 0.36);
+    k.position.set(s * 0.235, y, L.MIRROR_Z + 0.28);
     scene.add(k);
   }
 
   // decor at the back corners of the counter, out of the way of the tools
   const vaseGlass = new THREE.MeshPhysicalMaterial({ color: 0xd8f0ff, roughness: 0.05, transparent: true, opacity: 0.5, clearcoat: 1 });
   const vase = new THREE.Mesh(new THREE.LatheGeometry([[0, 0], [0.035, 0], [0.045, 0.05], [0.03, 0.12], [0.034, 0.15], [0, 0.15]].map(([x, y]) => new THREE.Vector2(x, y)), 32), vaseGlass);
-  vase.position.set(-0.43, L.COUNTER_TOP, L.MIRROR_Z + 0.09);
+  vase.position.set(-0.43, L.COUNTER_TOP, L.MIRROR_Z + 0.07);
   shadowed(vase);
   const stemMat = new THREE.MeshStandardMaterial({ color: 0x4f9a5a });
   const petals = [0xff7fa3, 0xffffff, 0xffb3c6, 0xff5c8a, 0xfff0a0];
@@ -231,10 +231,10 @@ export function buildRoom(scene, L) {
     scene.add(grp);
   }
   const perfume = new THREE.Mesh(new RoundedBoxGeometry(0.05, 0.07, 0.03, 3, 0.008), new THREE.MeshPhysicalMaterial({ color: 0xffc0d8, roughness: 0.05, transparent: true, opacity: 0.7, clearcoat: 1 }));
-  perfume.position.set(0.42, L.COUNTER_TOP + 0.035, L.MIRROR_Z + 0.1);
+  perfume.position.set(0.42, L.COUNTER_TOP + 0.035, L.MIRROR_Z + 0.07);
   shadowed(perfume);
   const pcap = new THREE.Mesh(new THREE.SphereGeometry(0.014, 24, 16), knob);
-  pcap.position.set(0.42, L.COUNTER_TOP + 0.08, L.MIRROR_Z + 0.1);
+  pcap.position.set(0.42, L.COUNTER_TOP + 0.08, L.MIRROR_Z + 0.07);
   shadowed(pcap);
 }
 
@@ -256,7 +256,7 @@ export function buildMirrorFrame(scene, L) {
   const bulbGeo = new THREE.SphereGeometry(0.017, 24, 16);
   const socketGeo = new THREE.CylinderGeometry(0.009, 0.009, 0.014, 16);
   const path = archShape(L.MIRROR_W + t, L.MIRROR_H + t, 0.04);
-  for (const p of path.getSpacedPoints(22)) {
+  for (const p of path.getSpacedPoints(18)) {
     if (p.y < -L.MIRROR_H / 2 + 0.06) continue;
     const s = new THREE.Mesh(socketGeo, socketMat);
     s.rotation.x = Math.PI / 2;

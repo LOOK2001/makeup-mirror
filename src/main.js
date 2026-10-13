@@ -10,13 +10,13 @@ import { buildRoom, buildMirrorFrame, archShape } from './room.js';
 
 // ---------- layout (metres; the player stands at the origin facing -Z) ----------
 const COUNTER_TOP = 1.0;
-const MIRROR_Z = -0.6;
-const MIRROR_W = 0.56;
-const MIRROR_H = 0.78;
-const MIRROR_Y = COUNTER_TOP + 0.15 + MIRROR_H / 2; // centre ~1.54 m, around face height when standing
+const MIRROR_Z = -0.4; // close, like leaning in to a vanity
+const MIRROR_W = 0.46;
+const MIRROR_H = 0.6; // a flat mirror shows ~2x its height: head, neck, a bit of chest
+const MIRROR_Y = COUNTER_TOP + 0.25 + MIRROR_H / 2; // centre ~1.55 m, around eye height when standing
 const LAYOUT = { COUNTER_TOP, MIRROR_Z, MIRROR_W, MIRROR_H, MIRROR_Y };
 const DESKTOP_EYE = new THREE.Vector3(0, 1.58, 0);
-const DESKTOP_FOV = 32; // narrow so the reflection fills the screen on desktop
+const DESKTOP_FOV = 28; // narrow so the reflection fills the screen on desktop
 
 // contact tuning for painting with a controller
 const CONTACT_GAP = 0.006;   // start painting this far before touching the skin
@@ -64,7 +64,7 @@ const windowLight = new THREE.DirectionalLight(0xdbeeff, 0.5);
 windowLight.position.set(-2, 1.8, 0.3);
 scene.add(windowLight);
 // warm vanity bulbs lighting the face (seen in the mirror)
-const faceLight = new THREE.PointLight(0xffe6c8, 0.4, 2.5, 2);
+const faceLight = new THREE.PointLight(0xffe6c8, 0.22, 2.5, 2);
 faceLight.position.set(0, MIRROR_Y + 0.15, MIRROR_Z + 0.2);
 scene.add(faceLight);
 
@@ -72,8 +72,8 @@ buildRoom(scene, LAYOUT);
 
 // ---------- mirror ----------
 const mirror = new Reflector(new THREE.ShapeGeometry(archShape(MIRROR_W, MIRROR_H), 64), {
-  textureWidth: 1152,
-  textureHeight: 1600,
+  textureWidth: 1024,
+  textureHeight: 1336,
   color: 0xeeeeee,
   clipBias: 0.003,
 });
@@ -88,7 +88,7 @@ const avatar = new Avatar(face.texture);
 scene.add(avatar.root);
 
 // ---------- tools ----------
-const { tray, items } = createToolTray(COUNTER_TOP, MIRROR_Z + 0.27);
+const { tray, items } = createToolTray(COUNTER_TOP, MIRROR_Z + 0.2);
 scene.add(tray);
 
 const raycaster = new THREE.Raycaster();
